@@ -19,7 +19,8 @@ libx264 is built from source during the Linux jobs (Alpine doesn't package a sta
 
 1. Go to **Actions → Release → Run workflow**
 2. Enter the FFmpeg version (e.g. `6.1.4`)
-3. The workflow builds all four targets in parallel, creates tag `v<version>`, and publishes a GitHub release with the binaries
+3. Optionally tick **overwrite** to delete and recreate an existing release (useful when rebuilding the same version with different flags)
+4. The workflow builds all four targets in parallel, creates tag `v<version>`, and publishes a GitHub release with the binaries
 
 ## Release assets
 
