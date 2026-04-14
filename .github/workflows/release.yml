@@ -14,14 +14,17 @@ permissions:
 jobs:
   build-linux-x64:
     runs-on: ubuntu-latest
-    container:
-      image: alpine:3.19
     steps:
-      - name: Install build deps
-        run: apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash
       - uses: actions/checkout@v4
-      - name: Build
-        run: ./build.sh "${{ inputs.version }}" ffmpeg-linux-x64
+      - name: Build in Alpine container
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.19 sh -c '
+            set -e
+            apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash
+            ./build.sh "$VERSION" ffmpeg-linux-x64
+          '
       - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-linux-x64
@@ -30,14 +33,17 @@ jobs:
 
   build-linux-arm64:
     runs-on: ubuntu-24.04-arm
-    container:
-      image: alpine:3.19
     steps:
-      - name: Install build deps
-        run: apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash
       - uses: actions/checkout@v4
-      - name: Build
-        run: ./build.sh "${{ inputs.version }}" ffmpeg-linux-arm64
+      - name: Build in Alpine container
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.19 sh -c '
+            set -e
+            apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash
+            ./build.sh "$VERSION" ffmpeg-linux-arm64
+          '
       - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-linux-arm64
