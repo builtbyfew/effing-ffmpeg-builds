@@ -1,0 +1,5 @@
+ffmpeg-*
+!build.sh
+ffmpeg.tar.xz
+ffmpeg-*.tar.xz
+LICENSE.txt

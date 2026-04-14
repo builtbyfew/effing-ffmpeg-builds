@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "FFmpeg version to build (e.g. 6.1.4)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-x64:
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.19
+    steps:
+      - name: Install build deps
+        run: apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig
+      - uses: actions/checkout@v4
+      - name: Build
+        run: ./build.sh "${{ inputs.version }}" ffmpeg-linux-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-x64
+          path: ffmpeg-linux-x64
+          if-no-files-found: error
+
+  build-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: alpine:3.19
+    steps:
+      - name: Install build deps
+        run: apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig
+      - uses: actions/checkout@v4
+      - name: Build
+        run: ./build.sh "${{ inputs.version }}" ffmpeg-linux-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux-arm64
+          path: ffmpeg-linux-arm64
+          if-no-files-found: error
+
+  build-darwin-x64:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: brew install nasm x264
+      - name: Build
+        run: ./build.sh "${{ inputs.version }}" ffmpeg-darwin-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-darwin-x64
+          path: ffmpeg-darwin-x64
+          if-no-files-found: error
+
+  build-darwin-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: brew install nasm x264
+      - name: Build
+        run: ./build.sh "${{ inputs.version }}" ffmpeg-darwin-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-darwin-arm64
+          path: ffmpeg-darwin-arm64
+          if-no-files-found: error
+
+  release:
+    runs-on: ubuntu-latest
+    needs:
+      - build-linux-x64
+      - build-linux-arm64
+      - build-darwin-x64
+      - build-darwin-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Gzip binaries and fetch LICENSE
+        run: |
+          set -eux
+          cd artifacts
+          ls -lh
+          for f in ffmpeg-darwin-arm64 ffmpeg-darwin-x64 ffmpeg-linux-arm64 ffmpeg-linux-x64; do
+            chmod +x "$f"
+            gzip --best -k "$f"
+          done
+          curl -fL -o LICENSE.txt \
+            "https://git.ffmpeg.org/gitweb/ffmpeg.git/blob_plain/n${{ inputs.version }}:/LICENSE.md"
+          ls -lh
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eux
+          TAG="v${{ inputs.version }}"
+          cd artifacts
+          gh release create "$TAG" \
+            --title "FFmpeg ${{ inputs.version }}" \
+            --notes "Static FFmpeg ${{ inputs.version }} builds for darwin-x64, darwin-arm64, linux-x64 (musl), linux-arm64 (musl). Built from source on GitHub-hosted runners. Licensed under GPLv3 (includes libx264); see LICENSE.txt." \
+            ffmpeg-darwin-arm64 \
+            ffmpeg-darwin-arm64.gz \
+            ffmpeg-darwin-x64 \
+            ffmpeg-darwin-x64.gz \
+            ffmpeg-linux-arm64 \
+            ffmpeg-linux-arm64.gz \
+            ffmpeg-linux-x64 \
+            ffmpeg-linux-x64.gz \
+            LICENSE.txt
