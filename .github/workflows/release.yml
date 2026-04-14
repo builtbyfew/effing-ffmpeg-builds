@@ -51,7 +51,7 @@ jobs:
           if-no-files-found: error
 
   build-darwin-x64:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - name: Install build deps
@@ -65,7 +65,7 @@ jobs:
           if-no-files-found: error
 
   build-darwin-arm64:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Install build deps

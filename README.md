@@ -8,8 +8,8 @@ Builds FFmpeg from source on GitHub-hosted runners for four targets:
 | --- | --- | --- |
 | `linux-x64` | `ubuntu-latest` + `alpine:3.19` | musl (fully static) |
 | `linux-arm64` | `ubuntu-24.04-arm` + `alpine:3.19` | musl (fully static) |
-| `darwin-x64` | `macos-13` | system (libx264/ffmpeg libs static) |
-| `darwin-arm64` | `macos-14` | system (libx264/ffmpeg libs static) |
+| `darwin-x64` | `macos-15-intel` | system (libx264/ffmpeg libs static) |
+| `darwin-arm64` | `macos-15` | system (libx264/ffmpeg libs static) |
 
 All builds are configured with `--enable-gpl --enable-libx264`. The Linux binaries are fully static and run on Alpine and any other Linux distro without glibc.
 
