@@ -18,7 +18,7 @@ jobs:
       image: alpine:3.19
     steps:
       - name: Install build deps
-        run: apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig
+        run: apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash
       - uses: actions/checkout@v4
       - name: Build
         run: ./build.sh "${{ inputs.version }}" ffmpeg-linux-x64
@@ -34,7 +34,7 @@ jobs:
       image: alpine:3.19
     steps:
       - name: Install build deps
-        run: apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig
+        run: apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash
       - uses: actions/checkout@v4
       - name: Build
         run: ./build.sh "${{ inputs.version }}" ffmpeg-linux-arm64
