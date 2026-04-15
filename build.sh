@@ -29,6 +29,13 @@ if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
   BREW_PREFIX="$(brew --prefix)"
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${BREW_PREFIX}/lib/pkgconfig:${BREW_PREFIX}/opt/mbedtls/lib/pkgconfig"
 fi
+# On MSYS2/MinGW64, preserve the default mingw64 pkgconfig path so system-installed
+# deps (e.g. mbedtls) are found alongside our local build.
+case "$(uname -s)" in
+  MINGW*|MSYS*)
+    export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/mingw64/lib/pkgconfig:/mingw64/share/pkgconfig"
+    ;;
+esac
 
 SRC_BIN="ffmpeg"
 case "$(uname -s)" in
