@@ -114,11 +114,7 @@ echo "==> Configuring"
   --disable-doc \
   --disable-ffplay \
   --disable-ffprobe \
-  --disable-xlib \
-  --disable-libxcb \
-  --disable-libxcb-shm \
-  --disable-libxcb-shape \
-  --disable-libxcb-xfixes \
+  --disable-autodetect \
   --pkg-config-flags="--static" \
   ${EXTRA_CFLAGS:+--extra-cflags="${EXTRA_CFLAGS}"} \
   ${EXTRA_LDFLAGS:+--extra-ldflags="${EXTRA_LDFLAGS}"} \
