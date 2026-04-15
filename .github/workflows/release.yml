@@ -83,6 +83,32 @@ jobs:
           path: ffmpeg-darwin-arm64
           if-no-files-found: error
 
+  build-win32-x64:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-nasm
+            git
+      - name: Build
+        env:
+          VERSION: ${{ inputs.version }}
+        run: ./build.sh "$VERSION" ffmpeg-win32-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-win32-x64
+          path: ffmpeg-win32-x64
+          if-no-files-found: error
+
   release:
     runs-on: ubuntu-latest
     needs:
@@ -90,6 +116,7 @@ jobs:
       - build-linux-arm64
       - build-darwin-x64
       - build-darwin-arm64
+      - build-win32-x64
     steps:
       - uses: actions/checkout@v4
 
@@ -104,7 +131,7 @@ jobs:
           set -eux
           cd artifacts
           ls -lh
-          for f in ffmpeg-darwin-arm64 ffmpeg-darwin-x64 ffmpeg-linux-arm64 ffmpeg-linux-x64; do
+          for f in ffmpeg-darwin-arm64 ffmpeg-darwin-x64 ffmpeg-linux-arm64 ffmpeg-linux-x64 ffmpeg-win32-x64; do
             chmod +x "$f"
             gzip --best -k "$f"
           done
@@ -130,7 +157,7 @@ jobs:
           cd artifacts
           gh release create "$TAG" \
             --title "FFmpeg ${{ inputs.version }}" \
-            --notes "Static FFmpeg ${{ inputs.version }} builds for darwin-x64, darwin-arm64, linux-x64 (musl), linux-arm64 (musl). Built from source on GitHub-hosted runners. Licensed under GPLv3 (includes libx264); see LICENSE.txt." \
+            --notes "Static FFmpeg ${{ inputs.version }} builds for darwin-x64, darwin-arm64, linux-x64 (musl), linux-arm64 (musl), win32-x64. Built from source on GitHub-hosted runners. Licensed under GPLv3 (includes libx264); see LICENSE.txt." \
             ffmpeg-darwin-arm64 \
             ffmpeg-darwin-arm64.gz \
             ffmpeg-darwin-x64 \
@@ -139,4 +166,6 @@ jobs:
             ffmpeg-linux-arm64.gz \
             ffmpeg-linux-x64 \
             ffmpeg-linux-x64.gz \
+            ffmpeg-win32-x64 \
+            ffmpeg-win32-x64.gz \
             LICENSE.txt

@@ -25,6 +25,7 @@ SRC_DIR="ffmpeg-${VERSION}"
 PREFIX="$(pwd)/local"
 export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
 
+SRC_BIN="ffmpeg"
 case "$(uname -s)" in
   Linux)
     NPROC=$(nproc)
@@ -35,6 +36,12 @@ case "$(uname -s)" in
     NPROC=$(sysctl -n hw.ncpu)
     EXTRA_LDFLAGS=""
     BUILD_X264=0
+    ;;
+  MINGW*|MSYS*)
+    NPROC=$(nproc)
+    EXTRA_LDFLAGS="-static"
+    BUILD_X264=1
+    SRC_BIN="ffmpeg.exe"
     ;;
   *)
     echo "Unsupported OS: $(uname -s)" >&2
@@ -75,26 +82,26 @@ echo "==> Building (-j${NPROC})"
 make -j"${NPROC}"
 
 echo "==> Verifying"
-./ffmpeg -version | head -n 1
-./ffmpeg -version | grep -q "ffmpeg version ${VERSION}" \
+"./${SRC_BIN}" -version | head -n 1
+"./${SRC_BIN}" -version | grep -q "ffmpeg version ${VERSION}" \
   || { echo "ERROR: version mismatch" >&2; exit 1; }
-./ffmpeg -buildconf | grep -q -- "--enable-libx264" \
+"./${SRC_BIN}" -buildconf | grep -q -- "--enable-libx264" \
   || { echo "ERROR: libx264 not enabled" >&2; exit 1; }
 
 if [ "$(uname -s)" = "Linux" ]; then
   echo "==> Verifying static linking (no dynamic deps)"
   # `ldd` on a fully static binary on Alpine prints "Not a valid dynamic program"
   # or fails — either way, presence of "=>" lines indicates dynamic linking.
-  if ldd ./ffmpeg 2>&1 | grep -q "=>"; then
+  if ldd "./${SRC_BIN}" 2>&1 | grep -q "=>"; then
     echo "ERROR: ffmpeg has dynamic dependencies:" >&2
-    ldd ./ffmpeg >&2
+    ldd "./${SRC_BIN}" >&2
     exit 1
   fi
 fi
 
 echo "==> Stripping"
-strip ./ffmpeg
+strip "./${SRC_BIN}"
 
-mv ./ffmpeg "../${OUTPUT}"
+mv "./${SRC_BIN}" "../${OUTPUT}"
 cd ..
 echo "==> Done: ${OUTPUT} ($(du -h "${OUTPUT}" | cut -f1))"
