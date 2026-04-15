@@ -24,16 +24,27 @@ SRC_URL="https://ffmpeg.org/releases/ffmpeg-${VERSION}.tar.xz"
 SRC_DIR="ffmpeg-${VERSION}"
 PREFIX="$(pwd)/local"
 export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
-# On macOS, add Homebrew's pkgconfig path so FFmpeg can locate mbedtls (and other brew-provided deps).
+# On macOS, add Homebrew's paths so FFmpeg can locate mbedtls (and other brew-provided deps).
+# We export CPATH/LIBRARY_PATH so the C compiler picks them up unconditionally,
+# even if FFmpeg's configure flag forwarding doesn't propagate them everywhere.
 if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
   BREW_PREFIX="$(brew --prefix)"
-  export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${BREW_PREFIX}/lib/pkgconfig:${BREW_PREFIX}/opt/mbedtls/lib/pkgconfig"
+  MBEDTLS_PREFIX="$(brew --prefix mbedtls 2>/dev/null || echo "${BREW_PREFIX}")"
+  export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${BREW_PREFIX}/lib/pkgconfig:${MBEDTLS_PREFIX}/lib/pkgconfig"
+  export CPATH="${BREW_PREFIX}/include:${MBEDTLS_PREFIX}/include"
+  export LIBRARY_PATH="${BREW_PREFIX}/lib:${MBEDTLS_PREFIX}/lib"
+  echo "==> macOS deps:"
+  echo "    BREW_PREFIX=${BREW_PREFIX}"
+  echo "    MBEDTLS_PREFIX=${MBEDTLS_PREFIX}"
+  ls "${MBEDTLS_PREFIX}/include/mbedtls/bignum.h" 2>&1 || echo "    WARNING: bignum.h missing at expected path"
 fi
-# On MSYS2/MinGW64, preserve the default mingw64 pkgconfig path so system-installed
+# On MSYS2/MinGW64, preserve the default mingw64 paths so system-installed
 # deps (e.g. mbedtls) are found alongside our local build.
 case "$(uname -s)" in
   MINGW*|MSYS*)
     export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/mingw64/lib/pkgconfig:/mingw64/share/pkgconfig"
+    export CPATH="/mingw64/include"
+    export LIBRARY_PATH="/mingw64/lib"
     ;;
 esac
 
