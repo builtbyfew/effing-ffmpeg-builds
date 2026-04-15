@@ -7,9 +7,9 @@
 # Assumes build deps are already installed:
 #   - Alpine: apk add build-base nasm coreutils curl tar xz git pkgconfig mbedtls-dev mbedtls-static
 #     (libx264 is built from source below because Alpine doesn't ship libx264.a)
-#   - macOS:  brew install nasm x264 mbedtls@2
-#     (mbedtls@2 is keg-only but ships bignum.h, which FFmpeg's RTMP code needs;
-#      Homebrew's mbedtls 3.x install omits it.)
+#   - macOS:  brew install nasm x264 cmake
+#     (mbedtls is built from source below because macOS ld prefers Homebrew's
+#      .dylib over .a, producing a non-portable binary.)
 #
 # On Linux, produces a fully static binary (musl, no dynamic linking).
 # On macOS, libx264 and FFmpeg libs are statically linked; system libs (libSystem) link dynamically as required by Apple.
@@ -21,43 +21,21 @@ OUTPUT="$2"
 
 # x264 revision (current HEAD of stable branch, pinned for reproducibility)
 X264_REV="b35605ace3ddf7c1a5d67a2eb553f034aef41d55"
+# mbedtls release tag (3.6.x is the current LTS)
+MBEDTLS_VERSION="3.6.4"
 
+OS="$(uname -s)"
 SRC_URL="https://ffmpeg.org/releases/ffmpeg-${VERSION}.tar.xz"
 SRC_DIR="ffmpeg-${VERSION}"
 PREFIX="$(pwd)/local"
 export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
-# On macOS, add Homebrew's paths so FFmpeg can locate mbedtls (and other brew-provided deps).
-# We export CPATH/LIBRARY_PATH so the C compiler picks them up unconditionally,
-# even if FFmpeg's configure flag forwarding doesn't propagate them everywhere.
-if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
-  BREW_PREFIX="$(brew --prefix)"
-  # Prefer mbedtls@2: it's keg-only but ships the full legacy header set
-  # (incl. mbedtls/bignum.h) that FFmpeg's RTMP code expects. mbedtls 3.x
-  # in Homebrew omits some of those, breaking the build.
-  MBEDTLS_PREFIX="$(brew --prefix mbedtls@2 2>/dev/null || brew --prefix mbedtls 2>/dev/null || echo "${BREW_PREFIX}/opt/mbedtls")"
-  export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${BREW_PREFIX}/lib/pkgconfig:${MBEDTLS_PREFIX}/lib/pkgconfig"
-  export CPATH="${BREW_PREFIX}/include:${MBEDTLS_PREFIX}/include"
-  export LIBRARY_PATH="${BREW_PREFIX}/lib:${MBEDTLS_PREFIX}/lib"
-  echo "==> macOS deps:"
-  echo "    BREW_PREFIX=${BREW_PREFIX}"
-  echo "    MBEDTLS_PREFIX=${MBEDTLS_PREFIX}"
-  echo "    mbedtls headers:"
-  ls "${MBEDTLS_PREFIX}/include/mbedtls/" 2>&1 | head -n 20 || true
-fi
-# On MSYS2/MinGW64, preserve the default mingw64 paths so system-installed
-# deps (e.g. mbedtls) are found alongside our local build.
-case "$(uname -s)" in
-  MINGW*|MSYS*)
-    export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/mingw64/lib/pkgconfig:/mingw64/share/pkgconfig"
-    export CPATH="/mingw64/include"
-    export LIBRARY_PATH="/mingw64/lib"
-    ;;
-esac
 
 SRC_BIN="ffmpeg"
 EXTRA_CFLAGS=""
+EXTRA_LDFLAGS=""
 EXTRA_LIBS=""
-case "$(uname -s)" in
+BUILD_MBEDTLS=0
+case "${OS}" in
   Linux)
     NPROC=$(nproc)
     EXTRA_LDFLAGS="-static"
@@ -65,9 +43,8 @@ case "$(uname -s)" in
     ;;
   Darwin)
     NPROC=$(sysctl -n hw.ncpu)
-    EXTRA_LDFLAGS="-L${BREW_PREFIX}/lib"
-    EXTRA_CFLAGS="-I${BREW_PREFIX}/include"
     BUILD_X264=0
+    BUILD_MBEDTLS=1
     ;;
   MINGW*|MSYS*)
     NPROC=$(nproc)
@@ -78,12 +55,34 @@ case "$(uname -s)" in
     EXTRA_LIBS="-lws2_32 -lbcrypt"
     BUILD_X264=1
     SRC_BIN="ffmpeg.exe"
+    # Preserve mingw64's default search paths so system-installed deps are found.
+    export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/mingw64/lib/pkgconfig:/mingw64/share/pkgconfig"
+    export CPATH="/mingw64/include"
+    export LIBRARY_PATH="/mingw64/lib"
     ;;
   *)
-    echo "Unsupported OS: $(uname -s)" >&2
+    echo "Unsupported OS: ${OS}" >&2
     exit 1
     ;;
 esac
+
+if [ "${BUILD_MBEDTLS}" = "1" ]; then
+  echo "==> Building mbedTLS ${MBEDTLS_VERSION} from source"
+  curl -fL -o mbedtls.tar.gz \
+    "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/mbedtls-${MBEDTLS_VERSION}.tar.gz"
+  mkdir mbedtls-src && tar xzf mbedtls.tar.gz -C mbedtls-src --strip-components=1
+  cd mbedtls-src
+  cmake -S . -B build \
+    -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DUSE_SHARED_MBEDTLS_LIBRARY=Off \
+    -DUSE_STATIC_MBEDTLS_LIBRARY=On \
+    -DENABLE_TESTING=Off \
+    -DENABLE_PROGRAMS=Off
+  cmake --build build -j"${NPROC}"
+  cmake --install build
+  cd ..
+fi
 
 if [ "${BUILD_X264}" = "1" ]; then
   echo "==> Building libx264 from source (rev ${X264_REV})"
@@ -132,16 +131,29 @@ echo "==> Verifying"
 "./${SRC_BIN}" -protocols 2>/dev/null | grep -qw "https" \
   || { echo "ERROR: https protocol not available" >&2; exit 1; }
 
-if [ "$(uname -s)" = "Linux" ]; then
-  echo "==> Verifying static linking (no dynamic deps)"
-  # `ldd` on a fully static binary on Alpine prints "Not a valid dynamic program"
-  # or fails — either way, presence of "=>" lines indicates dynamic linking.
-  if ldd "./${SRC_BIN}" 2>&1 | grep -q "=>"; then
-    echo "ERROR: ffmpeg has dynamic dependencies:" >&2
-    ldd "./${SRC_BIN}" >&2
-    exit 1
-  fi
-fi
+case "${OS}" in
+  Linux)
+    echo "==> Verifying static linking (no dynamic deps)"
+    # `ldd` on a fully static binary on Alpine prints "Not a valid dynamic program"
+    # or fails — either way, presence of "=>" lines indicates dynamic linking.
+    if ldd "./${SRC_BIN}" 2>&1 | grep -q "=>"; then
+      echo "ERROR: ffmpeg has dynamic dependencies:" >&2
+      ldd "./${SRC_BIN}" >&2
+      exit 1
+    fi
+    ;;
+  Darwin)
+    echo "==> Verifying no non-system dylib deps (Homebrew etc.)"
+    # Anything outside /usr/lib or /System (e.g. /opt/homebrew, /usr/local)
+    # means the binary won't run on a clean Mac.
+    NON_SYSTEM_DEPS=$(otool -L "./${SRC_BIN}" | tail -n +2 | awk '{print $1}' | grep -Ev '^(/usr/lib/|/System/)' || true)
+    if [ -n "${NON_SYSTEM_DEPS}" ]; then
+      echo "ERROR: ffmpeg has non-system dynamic deps:" >&2
+      echo "${NON_SYSTEM_DEPS}" >&2
+      exit 1
+    fi
+    ;;
+esac
 
 echo "==> Stripping"
 strip "./${SRC_BIN}"
