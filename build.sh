@@ -69,6 +69,7 @@ cd "${SRC_DIR}"
 echo "==> Configuring"
 ./configure \
   --enable-gpl \
+  --enable-version3 \
   --enable-libx264 \
   --enable-mbedtls \
   --enable-static \
