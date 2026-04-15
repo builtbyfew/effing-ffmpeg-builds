@@ -38,6 +38,7 @@ case "$(uname -s)" in
 esac
 
 SRC_BIN="ffmpeg"
+EXTRA_CFLAGS=""
 case "$(uname -s)" in
   Linux)
     NPROC=$(nproc)
@@ -46,7 +47,8 @@ case "$(uname -s)" in
     ;;
   Darwin)
     NPROC=$(sysctl -n hw.ncpu)
-    EXTRA_LDFLAGS=""
+    EXTRA_LDFLAGS="-L${BREW_PREFIX}/lib"
+    EXTRA_CFLAGS="-I${BREW_PREFIX}/include"
     BUILD_X264=0
     ;;
   MINGW*|MSYS*)
@@ -90,6 +92,7 @@ echo "==> Configuring"
   --disable-ffplay \
   --disable-ffprobe \
   --pkg-config-flags="--static" \
+  ${EXTRA_CFLAGS:+--extra-cflags="${EXTRA_CFLAGS}"} \
   ${EXTRA_LDFLAGS:+--extra-ldflags="${EXTRA_LDFLAGS}"}
 
 echo "==> Building (-j${NPROC})"
