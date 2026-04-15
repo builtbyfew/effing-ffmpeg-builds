@@ -27,7 +27,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.19 sh -c '
             set -e
-            apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash mbedtls-dev mbedtls-static
+            apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash mbedtls-dev mbedtls-static zlib-dev zlib-static
             ./build.sh "$VERSION" ffmpeg-linux-x64
           '
       - uses: actions/upload-artifact@v4
@@ -46,7 +46,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.19 sh -c '
             set -e
-            apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash mbedtls-dev mbedtls-static
+            apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash mbedtls-dev mbedtls-static zlib-dev zlib-static
             ./build.sh "$VERSION" ffmpeg-linux-arm64
           '
       - uses: actions/upload-artifact@v4
@@ -99,6 +99,7 @@ jobs:
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-nasm
             mingw-w64-x86_64-mbedtls
+            mingw-w64-x86_64-zlib
             git
       - name: Build
         env:

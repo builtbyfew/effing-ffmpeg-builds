@@ -5,7 +5,7 @@
 # Example: build.sh 6.1.4 ffmpeg-linux-x64
 #
 # Assumes build deps are already installed:
-#   - Alpine: apk add build-base nasm coreutils curl tar xz git pkgconfig mbedtls-dev mbedtls-static
+#   - Alpine: apk add build-base nasm coreutils curl tar xz git pkgconfig mbedtls-dev mbedtls-static zlib-dev zlib-static
 #     (libx264 is built from source below because Alpine doesn't ship libx264.a)
 #   - macOS:  brew install nasm cmake
 #     (libx264 and mbedtls are built from source below because macOS ld
@@ -109,6 +109,7 @@ echo "==> Configuring"
   --enable-version3 \
   --enable-libx264 \
   --enable-mbedtls \
+  --enable-zlib \
   --enable-static \
   --disable-shared \
   --disable-doc \
@@ -127,12 +128,34 @@ echo "==> Verifying"
 "./${SRC_BIN}" -version | head -n 1
 "./${SRC_BIN}" -version | grep -q "ffmpeg version ${VERSION}" \
   || { echo "ERROR: version mismatch" >&2; exit 1; }
-"./${SRC_BIN}" -buildconf | grep -q -- "--enable-libx264" \
-  || { echo "ERROR: libx264 not enabled" >&2; exit 1; }
-"./${SRC_BIN}" -buildconf | grep -q -- "--enable-mbedtls" \
-  || { echo "ERROR: mbedtls not enabled" >&2; exit 1; }
-"./${SRC_BIN}" -protocols 2>/dev/null | grep -qw "https" \
-  || { echo "ERROR: https protocol not available" >&2; exit 1; }
+
+# Check that the listed names appear in `ffmpeg -<kind>s` output.
+# `kind` is decoder|encoder|muxer|protocol; the rest of the args are names to require.
+verify_features() {
+  kind=$1
+  shift
+  list=$("./${SRC_BIN}" -hide_banner "-${kind}s" 2>/dev/null | awk '{print $2}')
+  for name in "$@"; do
+    echo "${list}" | grep -qx "${name}" \
+      || { echo "ERROR: ${kind} '${name}' not enabled" >&2; exit 1; }
+  done
+}
+verify_features decoder  png mjpeg h264 hevc vp9 aac mp3 opus vorbis gif bmp tiff webp
+verify_features encoder  libx264 mjpeg png aac
+verify_features muxer    mp4 mov matroska webm image2
+verify_features protocol file pipe http https
+
+echo "==> End-to-end test: image + video round-trips"
+TEST=_smoketest
+rm -f "${TEST}".*
+# Generate a PNG, transcode to JPEG, then re-decode it.
+"./${SRC_BIN}" -hide_banner -loglevel error -f lavfi -i color=c=red:s=64x64 -frames:v 1 -y "${TEST}.png"
+"./${SRC_BIN}" -hide_banner -loglevel error -i "${TEST}.png" -y "${TEST}.jpg"
+"./${SRC_BIN}" -hide_banner -loglevel error -i "${TEST}.jpg" -f null -
+# Encode a short H.264 MP4 with libx264, then decode a frame back to PNG.
+"./${SRC_BIN}" -hide_banner -loglevel error -f lavfi -i testsrc=duration=1:size=320x240:rate=10 -c:v libx264 -y "${TEST}.mp4"
+"./${SRC_BIN}" -hide_banner -loglevel error -i "${TEST}.mp4" -frames:v 1 -y "${TEST}.out.png"
+rm -f "${TEST}".*
 
 case "${OS}" in
   Linux)
