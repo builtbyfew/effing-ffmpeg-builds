@@ -7,9 +7,9 @@
 # Assumes build deps are already installed:
 #   - Alpine: apk add build-base nasm coreutils curl tar xz git pkgconfig mbedtls-dev mbedtls-static
 #     (libx264 is built from source below because Alpine doesn't ship libx264.a)
-#   - macOS:  brew install nasm x264 cmake
-#     (mbedtls is built from source below because macOS ld prefers Homebrew's
-#      .dylib over .a, producing a non-portable binary.)
+#   - macOS:  brew install nasm cmake
+#     (libx264 and mbedtls are built from source below because macOS ld
+#      prefers Homebrew's .dylib over .a, producing a non-portable binary.)
 #
 # On Linux, produces a fully static binary (musl, no dynamic linking).
 # On macOS, libx264 and FFmpeg libs are statically linked; system libs (libSystem) link dynamically as required by Apple.
@@ -43,7 +43,7 @@ case "${OS}" in
     ;;
   Darwin)
     NPROC=$(sysctl -n hw.ncpu)
-    BUILD_X264=0
+    BUILD_X264=1
     BUILD_MBEDTLS=1
     ;;
   MINGW*|MSYS*)
@@ -114,6 +114,11 @@ echo "==> Configuring"
   --disable-doc \
   --disable-ffplay \
   --disable-ffprobe \
+  --disable-xlib \
+  --disable-libxcb \
+  --disable-libxcb-shm \
+  --disable-libxcb-shape \
+  --disable-libxcb-xfixes \
   --pkg-config-flags="--static" \
   ${EXTRA_CFLAGS:+--extra-cflags="${EXTRA_CFLAGS}"} \
   ${EXTRA_LDFLAGS:+--extra-ldflags="${EXTRA_LDFLAGS}"} \
