@@ -68,9 +68,11 @@ esac
 
 if [ "${BUILD_MBEDTLS}" = "1" ]; then
   echo "==> Building mbedTLS ${MBEDTLS_VERSION} from source"
-  curl -fL -o mbedtls.tar.gz \
-    "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/mbedtls-${MBEDTLS_VERSION}.tar.gz"
-  mkdir mbedtls-src && tar xzf mbedtls.tar.gz -C mbedtls-src --strip-components=1
+  # Use the official release archive, not the GitHub auto-generated tag tarball:
+  # mbedtls 3.6 has a `framework` submodule that's only bundled in the official release.
+  curl -fL -o mbedtls.tar.bz2 \
+    "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${MBEDTLS_VERSION}/mbedtls-${MBEDTLS_VERSION}.tar.bz2"
+  mkdir mbedtls-src && tar xjf mbedtls.tar.bz2 -C mbedtls-src --strip-components=1
   cd mbedtls-src
   cmake -S . -B build \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
