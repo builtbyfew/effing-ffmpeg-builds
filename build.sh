@@ -5,9 +5,9 @@
 # Example: build.sh 6.1.4 ffmpeg-linux-x64
 #
 # Assumes build deps are already installed:
-#   - Alpine: apk add build-base nasm coreutils curl tar xz git pkgconfig
+#   - Alpine: apk add build-base nasm coreutils curl tar xz git pkgconfig mbedtls-dev mbedtls-static
 #     (libx264 is built from source below because Alpine doesn't ship libx264.a)
-#   - macOS:  brew install nasm x264
+#   - macOS:  brew install nasm x264 mbedtls
 #
 # On Linux, produces a fully static binary (musl, no dynamic linking).
 # On macOS, libx264 and FFmpeg libs are statically linked; system libs (libSystem) link dynamically as required by Apple.
@@ -70,6 +70,7 @@ echo "==> Configuring"
 ./configure \
   --enable-gpl \
   --enable-libx264 \
+  --enable-mbedtls \
   --enable-static \
   --disable-shared \
   --disable-doc \
@@ -87,6 +88,10 @@ echo "==> Verifying"
   || { echo "ERROR: version mismatch" >&2; exit 1; }
 "./${SRC_BIN}" -buildconf | grep -q -- "--enable-libx264" \
   || { echo "ERROR: libx264 not enabled" >&2; exit 1; }
+"./${SRC_BIN}" -buildconf | grep -q -- "--enable-mbedtls" \
+  || { echo "ERROR: mbedtls not enabled" >&2; exit 1; }
+"./${SRC_BIN}" -protocols 2>/dev/null | grep -q "^https$" \
+  || { echo "ERROR: https protocol not available" >&2; exit 1; }
 
 if [ "$(uname -s)" = "Linux" ]; then
   echo "==> Verifying static linking (no dynamic deps)"
