@@ -91,7 +91,7 @@ echo "==> Verifying"
   || { echo "ERROR: libx264 not enabled" >&2; exit 1; }
 "./${SRC_BIN}" -buildconf | grep -q -- "--enable-mbedtls" \
   || { echo "ERROR: mbedtls not enabled" >&2; exit 1; }
-"./${SRC_BIN}" -protocols 2>/dev/null | grep -q "^https$" \
+"./${SRC_BIN}" -protocols 2>/dev/null | grep -qw "https" \
   || { echo "ERROR: https protocol not available" >&2; exit 1; }
 
 if [ "$(uname -s)" = "Linux" ]; then
