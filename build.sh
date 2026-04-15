@@ -39,6 +39,7 @@ esac
 
 SRC_BIN="ffmpeg"
 EXTRA_CFLAGS=""
+EXTRA_LIBS=""
 case "$(uname -s)" in
   Linux)
     NPROC=$(nproc)
@@ -53,7 +54,11 @@ case "$(uname -s)" in
     ;;
   MINGW*|MSYS*)
     NPROC=$(nproc)
-    EXTRA_LDFLAGS="-static"
+    EXTRA_LDFLAGS="-static -L/mingw64/lib"
+    EXTRA_CFLAGS="-I/mingw64/include"
+    # mbedtls on Windows needs Winsock + Crypto API symbols at static link time;
+    # without these the configure probe fails with "mbedTLS not found".
+    EXTRA_LIBS="-lws2_32 -lbcrypt"
     BUILD_X264=1
     SRC_BIN="ffmpeg.exe"
     ;;
@@ -93,7 +98,8 @@ echo "==> Configuring"
   --disable-ffprobe \
   --pkg-config-flags="--static" \
   ${EXTRA_CFLAGS:+--extra-cflags="${EXTRA_CFLAGS}"} \
-  ${EXTRA_LDFLAGS:+--extra-ldflags="${EXTRA_LDFLAGS}"}
+  ${EXTRA_LDFLAGS:+--extra-ldflags="${EXTRA_LDFLAGS}"} \
+  ${EXTRA_LIBS:+--extra-libs="${EXTRA_LIBS}"}
 
 echo "==> Building (-j${NPROC})"
 make -j"${NPROC}"
