@@ -131,10 +131,16 @@ echo "==> Verifying"
 
 # Check that the listed names appear in `ffmpeg -<kind>s` output.
 # `kind` is decoder|encoder|muxer|protocol; the rest of the args are names to require.
+# Decoder/encoder/muxer rows are ` <flags> <name>  <desc>` (name in $2);
+# protocol rows are bare-indented names (name in $1).
 verify_features() {
   kind=$1
   shift
-  list=$("./${SRC_BIN}" -hide_banner "-${kind}s" 2>/dev/null | awk '{print $2}')
+  case "${kind}" in
+    protocol) col=1 ;;
+    *)        col=2 ;;
+  esac
+  list=$("./${SRC_BIN}" -hide_banner "-${kind}s" 2>/dev/null | awk -v c="${col}" '{print $c}')
   for name in "$@"; do
     echo "${list}" | grep -qx "${name}" \
       || { echo "ERROR: ${kind} '${name}' not enabled" >&2; exit 1; }
