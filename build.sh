@@ -7,7 +7,9 @@
 # Assumes build deps are already installed:
 #   - Alpine: apk add build-base nasm coreutils curl tar xz git pkgconfig mbedtls-dev mbedtls-static
 #     (libx264 is built from source below because Alpine doesn't ship libx264.a)
-#   - macOS:  brew install nasm x264 mbedtls
+#   - macOS:  brew install nasm x264 mbedtls@2
+#     (mbedtls@2 is keg-only but ships bignum.h, which FFmpeg's RTMP code needs;
+#      Homebrew's mbedtls 3.x install omits it.)
 #
 # On Linux, produces a fully static binary (musl, no dynamic linking).
 # On macOS, libx264 and FFmpeg libs are statically linked; system libs (libSystem) link dynamically as required by Apple.
@@ -29,14 +31,18 @@ export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
 # even if FFmpeg's configure flag forwarding doesn't propagate them everywhere.
 if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
   BREW_PREFIX="$(brew --prefix)"
-  MBEDTLS_PREFIX="$(brew --prefix mbedtls 2>/dev/null || echo "${BREW_PREFIX}")"
+  # Prefer mbedtls@2: it's keg-only but ships the full legacy header set
+  # (incl. mbedtls/bignum.h) that FFmpeg's RTMP code expects. mbedtls 3.x
+  # in Homebrew omits some of those, breaking the build.
+  MBEDTLS_PREFIX="$(brew --prefix mbedtls@2 2>/dev/null || brew --prefix mbedtls 2>/dev/null || echo "${BREW_PREFIX}/opt/mbedtls")"
   export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${BREW_PREFIX}/lib/pkgconfig:${MBEDTLS_PREFIX}/lib/pkgconfig"
   export CPATH="${BREW_PREFIX}/include:${MBEDTLS_PREFIX}/include"
   export LIBRARY_PATH="${BREW_PREFIX}/lib:${MBEDTLS_PREFIX}/lib"
   echo "==> macOS deps:"
   echo "    BREW_PREFIX=${BREW_PREFIX}"
   echo "    MBEDTLS_PREFIX=${MBEDTLS_PREFIX}"
-  ls "${MBEDTLS_PREFIX}/include/mbedtls/bignum.h" 2>&1 || echo "    WARNING: bignum.h missing at expected path"
+  echo "    mbedtls headers:"
+  ls "${MBEDTLS_PREFIX}/include/mbedtls/" 2>&1 | head -n 20 || true
 fi
 # On MSYS2/MinGW64, preserve the default mingw64 paths so system-installed
 # deps (e.g. mbedtls) are found alongside our local build.

@@ -60,7 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install build deps
-        run: brew install nasm x264 mbedtls
+        run: brew install nasm x264 mbedtls@2
       - name: Build
         run: ./build.sh "${{ inputs.version }}" ffmpeg-darwin-x64
       - uses: actions/upload-artifact@v4
@@ -74,7 +74,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install build deps
-        run: brew install nasm x264 mbedtls
+        run: brew install nasm x264 mbedtls@2
       - name: Build
         run: ./build.sh "${{ inputs.version }}" ffmpeg-darwin-arm64
       - uses: actions/upload-artifact@v4
