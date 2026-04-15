@@ -24,6 +24,11 @@ SRC_URL="https://ffmpeg.org/releases/ffmpeg-${VERSION}.tar.xz"
 SRC_DIR="ffmpeg-${VERSION}"
 PREFIX="$(pwd)/local"
 export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig"
+# On macOS, add Homebrew's pkgconfig path so FFmpeg can locate mbedtls (and other brew-provided deps).
+if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
+  BREW_PREFIX="$(brew --prefix)"
+  export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${BREW_PREFIX}/lib/pkgconfig:${BREW_PREFIX}/opt/mbedtls/lib/pkgconfig"
+fi
 
 SRC_BIN="ffmpeg"
 case "$(uname -s)" in
