@@ -16,43 +16,38 @@ on:
 permissions:
   contents: write
 
-jobs:
-  build-linux-x64:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build in Alpine container
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.22 sh -c '
-            set -e
-            apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash mbedtls-dev mbedtls-static zlib-dev zlib-static
-            ./build.sh "$VERSION" ffmpeg-linux-x64
-          '
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ffmpeg-linux-x64
-          path: ffmpeg-linux-x64
-          if-no-files-found: error
+env:
+  # Alpine only supplies the toolchain for the Linux builds: build.sh compiles
+  # libx264 and mbedTLS from source, so any recent Alpine release works here.
+  ALPINE_IMAGE: alpine:3.22
 
-  build-linux-arm64:
-    runs-on: ubuntu-24.04-arm
+jobs:
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - name: Build in Alpine container
         env:
           VERSION: ${{ inputs.version }}
+          ARCH: ${{ matrix.arch }}
         run: |
-          docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.22 sh -c '
+          docker run --rm -v "$PWD:/w" -w /w -e VERSION -e ARCH "$ALPINE_IMAGE" sh -c '
             set -e
-            apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash mbedtls-dev mbedtls-static zlib-dev zlib-static
-            ./build.sh "$VERSION" ffmpeg-linux-arm64
+            apk add --no-cache build-base cmake nasm coreutils curl tar xz git pkgconfig bash zlib-dev zlib-static
+            ./build.sh "$VERSION" "ffmpeg-linux-$ARCH"
           '
       - uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-linux-arm64
-          path: ffmpeg-linux-arm64
+          name: ffmpeg-linux-${{ matrix.arch }}
+          path: ffmpeg-linux-${{ matrix.arch }}
           if-no-files-found: error
 
   build-darwin-x64:
@@ -94,6 +89,11 @@ jobs:
         with:
           msystem: MINGW64
           update: true
+          # mbedtls is unpinned: MSYS2 currently ships mbedTLS 3.6.x, which is
+          # what FFmpeg supports. If this job starts failing with mbedTLS API
+          # errors, MSYS2 has moved to 4.x; switch to building mbedTLS from
+          # source in build.sh (BUILD_MBEDTLS=1 + mingw-w64-x86_64-cmake) as
+          # the Linux and macOS builds already do.
           install: >-
             base-devel
             mingw-w64-x86_64-toolchain
@@ -114,8 +114,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs:
-      - build-linux-x64
-      - build-linux-arm64
+      - build-linux
       - build-darwin-x64
       - build-darwin-arm64
       - build-win32-x64
