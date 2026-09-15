@@ -5,11 +5,16 @@
 # Example: build.sh 6.1.4 ffmpeg-linux-x64
 #
 # Assumes build deps are already installed:
-#   - Alpine: apk add build-base nasm coreutils curl tar xz git pkgconfig mbedtls-dev mbedtls-static zlib-dev zlib-static
-#     (libx264 is built from source below because Alpine doesn't ship libx264.a)
-#   - macOS:  brew install nasm cmake
+#   - Alpine:  apk add build-base cmake nasm coreutils curl tar xz git pkgconfig bash zlib-dev zlib-static
+#     (bash is needed by x264's configure. libx264 and mbedtls are built from
+#      source below: Alpine doesn't ship libx264.a, and its mbedtls package
+#      tracks whatever major version the Alpine release happens to carry, which
+#      FFmpeg may not support -- e.g. 3.19 had 2.28, 3.24+ has 4.x.)
+#   - macOS:   brew install nasm cmake
 #     (libx264 and mbedtls are built from source below because macOS ld
 #      prefers Homebrew's .dylib over .a, producing a non-portable binary.)
+#   - MSYS2/MinGW64: see .github/workflows/release.yml
+#     (mbedtls comes from the MSYS2 package there; libx264 is built from source.)
 #
 # On Linux, produces a fully static binary (musl, no dynamic linking).
 # On macOS, libx264 and FFmpeg libs are statically linked; system libs (libSystem) link dynamically as required by Apple.
@@ -21,8 +26,9 @@ OUTPUT="$2"
 
 # x264 revision (current HEAD of stable branch, pinned for reproducibility)
 X264_REV="b35605ace3ddf7c1a5d67a2eb553f034aef41d55"
-# mbedtls release tag (3.6.x is the current LTS)
-MBEDTLS_VERSION="3.6.4"
+# mbedtls release tag, used wherever BUILD_MBEDTLS=1 (3.6.x is the current LTS
+# and the newest major FFmpeg supports; keep in step with the MSYS2 package).
+MBEDTLS_VERSION="3.6.7"
 
 OS="$(uname -s)"
 SRC_URL="https://ffmpeg.org/releases/ffmpeg-${VERSION}.tar.xz"
@@ -40,6 +46,7 @@ case "${OS}" in
     NPROC=$(nproc)
     EXTRA_LDFLAGS="-static"
     BUILD_X264=1
+    BUILD_MBEDTLS=1
     ;;
   Darwin)
     NPROC=$(sysctl -n hw.ncpu)
