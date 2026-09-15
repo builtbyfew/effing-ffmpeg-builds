@@ -5,7 +5,7 @@
 # Example: build.sh 6.1.4 ffmpeg-linux-x64
 #
 # Assumes build deps are already installed:
-#   - Alpine: apk add build-base nasm coreutils curl tar xz git pkgconfig mbedtls-dev mbedtls-static zlib-dev zlib-static
+#   - Alpine (3.20+, for mbedTLS 3.x): apk add build-base nasm coreutils curl tar xz git pkgconfig mbedtls-dev mbedtls-static zlib-dev zlib-static
 #     (libx264 is built from source below because Alpine doesn't ship libx264.a)
 #   - macOS:  brew install nasm cmake
 #     (libx264 and mbedtls are built from source below because macOS ld

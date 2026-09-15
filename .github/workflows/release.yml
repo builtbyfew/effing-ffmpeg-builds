@@ -25,7 +25,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.19 sh -c '
+          docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.22 sh -c '
             set -e
             apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash mbedtls-dev mbedtls-static zlib-dev zlib-static
             ./build.sh "$VERSION" ffmpeg-linux-x64
@@ -44,7 +44,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.19 sh -c '
+          docker run --rm -v "$PWD:/w" -w /w -e VERSION alpine:3.22 sh -c '
             set -e
             apk add --no-cache build-base nasm coreutils curl tar xz git pkgconfig bash mbedtls-dev mbedtls-static zlib-dev zlib-static
             ./build.sh "$VERSION" ffmpeg-linux-arm64

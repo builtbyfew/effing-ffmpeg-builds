@@ -6,8 +6,8 @@ Builds FFmpeg from source on GitHub-hosted runners for four targets:
 
 | Target | Runner | Libc |
 | --- | --- | --- |
-| `linux-x64` | `ubuntu-latest` + `alpine:3.19` | musl (fully static) |
-| `linux-arm64` | `ubuntu-24.04-arm` + `alpine:3.19` | musl (fully static) |
+| `linux-x64` | `ubuntu-latest` + `alpine:3.22` | musl (fully static) |
+| `linux-arm64` | `ubuntu-24.04-arm` + `alpine:3.22` | musl (fully static) |
 | `darwin-x64` | `macos-15-intel` | system (libx264/ffmpeg libs static) |
 | `darwin-arm64` | `macos-15` | system (libx264/ffmpeg libs static) |
 | `win32-x64` | `windows-latest` + MSYS2/MinGW64 | mingw (fully static) |
