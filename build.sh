@@ -14,7 +14,8 @@
 #     (libx264 and mbedtls are built from source below because macOS ld
 #      prefers Homebrew's .dylib over .a, producing a non-portable binary.)
 #   - MSYS2/MinGW64: see .github/workflows/release.yml
-#     (mbedtls comes from the MSYS2 package there; libx264 is built from source.)
+#     (libx264 and mbedtls are built from source here too: the MSYS2 mbedtls
+#      package can lag behind mbedTLS security releases.)
 #
 # On Linux, produces a fully static binary (musl, no dynamic linking).
 # On macOS, libx264 and FFmpeg libs are statically linked; system libs (libSystem) link dynamically as required by Apple.
@@ -26,9 +27,9 @@ OUTPUT="$2"
 
 # x264 revision (current HEAD of stable branch, pinned for reproducibility)
 X264_REV="b35605ace3ddf7c1a5d67a2eb553f034aef41d55"
-# mbedtls release tag, used wherever BUILD_MBEDTLS=1 (3.6.x is the current LTS
-# and the newest major FFmpeg supports; keep in step with the MSYS2 package).
-MBEDTLS_VERSION="3.6.7"
+# mbedtls release tag, built from source on every platform (3.6.x is the
+# current LTS and the newest major FFmpeg supports).
+MBEDTLS_VERSION="3.6.8"
 
 OS="$(uname -s)"
 SRC_URL="https://ffmpeg.org/releases/ffmpeg-${VERSION}.tar.xz"
@@ -61,6 +62,7 @@ case "${OS}" in
     # without these the configure probe fails with "mbedTLS not found".
     EXTRA_LIBS="-lws2_32 -lbcrypt"
     BUILD_X264=1
+    BUILD_MBEDTLS=1
     SRC_BIN="ffmpeg.exe"
     # Preserve mingw64's default search paths so system-installed deps are found.
     export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/mingw64/lib/pkgconfig:/mingw64/share/pkgconfig"
@@ -87,7 +89,8 @@ if [ "${BUILD_MBEDTLS}" = "1" ]; then
     -DUSE_SHARED_MBEDTLS_LIBRARY=Off \
     -DUSE_STATIC_MBEDTLS_LIBRARY=On \
     -DENABLE_TESTING=Off \
-    -DENABLE_PROGRAMS=Off
+    -DENABLE_PROGRAMS=Off \
+    -DMBEDTLS_FATAL_WARNINGS=Off
   cmake --build build -j"${NPROC}"
   cmake --install build
   cd ..
