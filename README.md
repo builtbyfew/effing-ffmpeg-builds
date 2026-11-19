@@ -14,14 +14,15 @@ Builds FFmpeg from source on GitHub-hosted runners for five targets:
 
 All builds are configured with `--enable-gpl --enable-libx264 --enable-mbedtls --enable-zlib` (mbedTLS provides HTTPS support). The Linux binaries are fully static (musl-linked) with no external libc dependency, so they run on any Linux distro. The Windows binary is fully static (no DLL deps) as well.
 
-libx264 is built from source on every platform (Alpine and MinGW don't package a static `libx264.a`; on macOS, ld would prefer Homebrew's `.dylib`). mbedTLS is also built from source on Linux and macOS, so the Alpine image (`ALPINE_IMAGE` in the workflow) only supplies the toolchain; on Windows it comes from the MSYS2 package. The x264 revision and mbedTLS version are pinned in `build.sh` for reproducibility.
+libx264 is built from source on every platform (Alpine and MinGW don't package a static `libx264.a`; on macOS, ld would prefer Homebrew's `.dylib`). mbedTLS is also built from source on every platform, so security releases land as soon as `MBEDTLS_VERSION` is bumped, and the Alpine image (`ALPINE_IMAGE` in the workflow) only supplies the toolchain. The x264 revision and mbedTLS version are pinned in `build.sh` for reproducibility.
 
 ## Triggering a release
 
 1. Go to **Actions → Release → Run workflow**
 2. Enter the FFmpeg version (e.g. `6.1.4`)
-3. Optionally tick **overwrite** to delete and recreate an existing release (useful when rebuilding the same version with different flags)
-4. The workflow builds all targets in parallel, creates tag `v<version>`, and publishes a GitHub release with the binaries
+3. To rebuild a version that is already released (for example after bumping mbedTLS or x264 in `build.sh` for a security fix), enter a **revision** such as `1`. The release is then tagged `v<version>-<revision>`, so existing releases, and the checksums `@effing/ffmpeg` pins for them, stay valid.
+4. Optionally tick **overwrite** to delete and recreate an existing release. Only do this for a release nothing pins yet: replacing published binaries breaks checksum verification for every `@effing/ffmpeg` version that uses that tag.
+5. The workflow builds all targets in parallel, creates tag `v<version>` (or `v<version>-<revision>`), and publishes a GitHub release with the binaries
 
 ## Release assets
 

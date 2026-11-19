@@ -7,6 +7,11 @@ on:
         description: "FFmpeg version to build (e.g. 6.1.4)"
         required: true
         type: string
+      revision:
+        description: "Build revision, for rebuilding the same FFmpeg version with updated dependencies (e.g. 1 publishes tag v6.1.4-1). Leave empty for the first build of a version."
+        required: false
+        type: string
+        default: ""
       overwrite:
         description: "Delete and recreate the release if it already exists"
         required: false
@@ -16,13 +21,37 @@ on:
 permissions:
   contents: write
 
+# Release tag and title. A revision gets its own tag so published releases
+# are never replaced: @effing/ffmpeg pins checksums per release, and swapping
+# the binaries under an existing tag breaks every install of it.
+run-name: Release v${{ inputs.version }}${{ inputs.revision && format('-{0}', inputs.revision) || '' }}
+
 env:
   # Alpine only supplies the toolchain for the Linux builds: build.sh compiles
   # libx264 and mbedTLS from source, so any recent Alpine release works here.
   ALPINE_IMAGE: alpine:3.22
 
 jobs:
+  # Fail fast on malformed inputs instead of after the builds.
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check version and revision
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          REVISION: ${{ inputs.revision }}
+        run: |
+          set -eu
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] \
+            || { echo "version must look like 6.1 or 6.1.4" >&2; exit 1; }
+          case "$REVISION" in
+            ""|[1-9]|[1-9][0-9]) ;;
+            *) echo "revision must be empty or a number from 1 to 99" >&2; exit 1 ;;
+          esac
+
   build-linux:
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
@@ -51,6 +80,7 @@ jobs:
           if-no-files-found: error
 
   build-darwin-x64:
+    needs: validate
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
@@ -65,6 +95,7 @@ jobs:
           if-no-files-found: error
 
   build-darwin-arm64:
+    needs: validate
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +110,7 @@ jobs:
           if-no-files-found: error
 
   build-win32-x64:
+    needs: validate
     runs-on: windows-latest
     defaults:
       run:
@@ -89,16 +121,14 @@ jobs:
         with:
           msystem: MINGW64
           update: true
-          # mbedtls is unpinned: MSYS2 currently ships mbedTLS 3.6.x, which is
-          # what FFmpeg supports. If this job starts failing with mbedTLS API
-          # errors, MSYS2 has moved to 4.x; switch to building mbedTLS from
-          # source in build.sh (BUILD_MBEDTLS=1 + mingw-w64-x86_64-cmake) as
-          # the Linux and macOS builds already do.
+          # mbedtls is built from source by build.sh (pinned MBEDTLS_VERSION),
+          # as on Linux and macOS, so cmake and ninja are needed here.
           install: >-
             base-devel
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-nasm
-            mingw-w64-x86_64-mbedtls
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
             mingw-w64-x86_64-zlib
             git
       - name: Build
@@ -144,21 +174,26 @@ jobs:
         if: ${{ inputs.overwrite }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          REVISION: ${{ inputs.revision }}
         run: |
           set -eu
-          TAG="v${{ inputs.version }}"
+          TAG="v${VERSION}${REVISION:+-$REVISION}"
           gh release delete "$TAG" --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
 
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          REVISION: ${{ inputs.revision }}
         run: |
           set -eux
-          TAG="v${{ inputs.version }}"
+          TAG="v${VERSION}${REVISION:+-$REVISION}"
           cd artifacts
           gh release create "$TAG" \
-            --title "FFmpeg ${{ inputs.version }}" \
-            --notes "Static FFmpeg ${{ inputs.version }} builds for darwin-x64, darwin-arm64, linux-x64 (musl), linux-arm64 (musl), win32-x64. Built from source on GitHub-hosted runners. Licensed under GPLv3 (includes libx264); see LICENSE.txt." \
+            --target "$GITHUB_SHA" \
+            --title "FFmpeg ${VERSION}${REVISION:+ (build $REVISION)}" \
+            --notes "Static FFmpeg ${VERSION} builds for darwin-x64, darwin-arm64, linux-x64 (musl), linux-arm64 (musl), win32-x64. Built from source on GitHub-hosted runners${REVISION:+ (build revision $REVISION: same FFmpeg source, rebuilt with the dependency pins in build.sh at $GITHUB_SHA)}. Licensed under GPLv3 (includes libx264); see LICENSE.txt." \
             ffmpeg-darwin-arm64 \
             ffmpeg-darwin-arm64.gz \
             ffmpeg-darwin-x64 \
